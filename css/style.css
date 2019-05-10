@@ -1,0 +1,70 @@
+.logo{
+  text-align:center;
+  display: inline block;
+  width:200px;
+}
+
+body{
+  font-family: Vazir;
+  background: linear-gradient(0deg, #f53844 0%,  #42378f 74%) fixed;
+  height:100%;
+  margin:0;
+  padding:0;
+}
+#background{
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  height:70%;
+  background: url(../Back.svg) no-repeat bottom center;
+  background-size: cover;
+  color: black;
+
+}
+
+  #moon {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      box-shadow: 2px 2px 0 0 white;
+      position:fixed;
+      top:70px;
+      right:150px;
+    }
+
+@media screen and (max-width: 600px) {
+   #moon {
+    right:20px;
+     top:20px;
+  }
+}
+
+.autocomplete-items {
+  position: absolute;
+  border: 1px solid #d4d4d4;
+  border-bottom: none;
+  border-top: none;
+  z-index: 99;
+  /*position the autocomplete items to be the same width as the container:*/
+  top: 100%;
+  left: 0;
+  right: 0;
+}
+.autocomplete-items div {
+  padding: 10px;
+  cursor: pointer;
+  background-color: #fff; 
+  border-bottom: 1px solid #d4d4d4; 
+}
+.autocomplete-items div:hover {
+  /*when hovering an item:*/
+  background-color: #e9e9e9; 
+}
+
+#mapContainer{
+  height: 200px;
+}
+
+.table th{
+  border-top: none;
+}
