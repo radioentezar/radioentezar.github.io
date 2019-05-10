@@ -1,7 +1,8 @@
 // Instantiate a map and platform object:
 var platform = new H.service.Platform({
   'app_id': 'S1l6Ytl6LQj6Jv2e85Jr',
-  'app_code': 'ZVDIaS77COAlZFXgKPtUHw'
+  'app_code': 'ZVDIaS77COAlZFXgKPtUHw',
+  'useHTTPS': true
 });
 // Retrieve the target element for the map:
 var targetElement = document.getElementById('mapContainer');
