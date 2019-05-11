@@ -1,3 +1,31 @@
+function scheduleEvent(time, triggerThis) {
+
+  // get hour and minute from hour:minute param received, ex.: '16:00'
+  const hour = Number(time.split(':')[0]);
+  const minute = Number(time.split(':')[1]);
+
+  // create a Date object at the desired timepoint
+  const startTime = new Date(); startTime.setHours(hour, minute);
+  const now = new Date();
+
+  // increase timepoint by 24 hours if in the past
+  if (startTime.getTime() < now.getTime()) {
+    startTime.setHours(startTime.getHours() + 24);
+  }
+
+  // get the interval in ms from now to the timepoint when to trigger the alarm
+  const firstTriggerAfterMs = startTime.getTime() - now.getTime();
+
+  // trigger the function triggerThis() at the timepoint
+  // create setInterval when the timepoint is reached to trigger it every day at this timepoint
+  setTimeout(function(){
+    triggerThis();
+    setInterval(triggerThis, 24 * 60 * 60 * 1000);
+  }, firstTriggerAfterMs);
+
+}
+
+
 // Instantiate a map and platform object:
 var platform = new H.service.Platform({
   'app_id': 'S1l6Ytl6LQj6Jv2e85Jr',
@@ -141,35 +169,64 @@ function enterCity(cityname){
       console.log("minutes to fajr = "+ minutesToFajr);
       console.log("minutes to maghrib = "+ minutesToMaghrib);
 
-      var itsFajrTime = Math.abs(minutesToFajr)<Math.abs(minutesToMaghrib);
+      //nextEvent = "fajr" , "maghrib" , "none"
+      var nextEvent="";
+      if(minutesToFajr< 0){
+        nextEvent = "fajr";
+      }else{
+        if(minutesToMaghrib<0){
+          nextEvent = "maghrib";
+        }else{
+          nextEvent = "none";
+        }
+      }
+      console.log(nextEvent);
+      //var itsFajrTime = Math.abs(minutesToFajr)<Math.abs(minutesToMaghrib);
+      //var itsMaghribTime = Math.abs(minutesToFajr)<Math.abs(minutesToMaghrib);
 
       var fajrURL = "./Shajarian-Rabana.mp3";
       var maghribURL = "./Shajarian-Rabana.mp3";
       var mp3url="";
       var minutes = 0;
 
+      var messageString ="";
       var startTotalMinute = 0;
-      if(itsFajrTime){
-        console.log("its fajr");
+
+      if(nextEvent === "fajr"){
         mp3url = fajrURL;
         minutes = minutesToFajr;
         startTotalMinute = fajrHour*60+fajrMin -30;
-      }else{
+      }else if(nextEvent === "maghrib"){
         mp3url = maghribURL;
         minutes = minutesToMaghrib;
         startTotalMinute = maghribHour*60+maghribMin -30;
+      }else if(nextEvent === "none"){
+
       }
       var startMinute = startTotalMinute%60;
       var startHour = Math.floor(startTotalMinute/60);
+      var startTimeString = startHour.toString().padStart(2, '0') + ':' +startMinute.toString().padStart(2, '0');
+      
 
-      const str1 = '50';
-      str1.padStart(2, '0');
-      var startTimeString = startHour+" : "+startMinute;
+      if(nextEvent === "fajr"){
+        console.log("its fajr");
+        messageString = `<h5 class="text-white" dir='rtl'> هم اکنون برنامه ای آماده ی پخش نیست. برنامه بعدی ساعت
+         ${startTimeString} پخش میشود. 
+        </h5>`;
+      }else if(nextEvent === "maghrib"){
+        messageString = `<h5 class="text-white" dir='rtl'> هم اکنون برنامه ای آماده ی پخش نیست. برنامه بعدی ساعت
+         ${startTimeString} پخش میشود. 
+        </h5>`;
+      }else if(nextEvent === "none"){
+        messageString = `<h5 class="text-white" dir='rtl'> هم اکنون برنامه ای آماده ی پخش نیست.
+        </h5>`;
+      }
+  
       if(minutes>-30&&minutes<30){
         shouldPlay = true;
         seek = (30+minutes)*60;
       }else{
-        hoursToStart
+        shouldPlay = false;
       }
 
       var source = {
@@ -212,8 +269,8 @@ function enterCity(cityname){
       });
         player.play();
       }else{
-
-        $("#playerPlace").html(`<h4 class="text-white" dir='rtl'>  هم اکنون برنامه ای آماده ی پخش نیست. برنامه بعدی ساعت  </h4>`)
+        $("#playerPlace").html(messageString);
+        scheduleEvent(startTimeString,function(){location.reload(); });   
       }
 
     })
