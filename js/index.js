@@ -270,6 +270,7 @@ function enterCity(cityname){
         player.play();
       }else{
         $("#playerPlace").html(messageString);
+        var startTimeString = startHour.toString().padStart(2, '0') + ':' +(startMinute+1).toString().padStart(2, '0');
         scheduleEvent(startTimeString,function(){location.reload(); });   
       }
 
