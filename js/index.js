@@ -148,19 +148,28 @@ function enterCity(cityname){
       var mp3url="";
       var minutes = 0;
 
+      var startTotalMinute = 0;
       if(itsFajrTime){
         console.log("its fajr");
         mp3url = fajrURL;
         minutes = minutesToFajr;
+        startTotalMinute = fajrHour*60+fajrMin -30;
       }else{
         mp3url = maghribURL;
         minutes = minutesToMaghrib;
+        startTotalMinute = maghribHour*60+maghribMin -30;
       }
+      var startMinute = startTotalMinute%60;
+      var startHour = Math.floor(startTotalMinute/60);
 
-      
+      const str1 = '50';
+      str1.padStart(2, '0');
+      var startTimeString = startHour+" : "+startMinute;
       if(minutes>-30&&minutes<30){
         shouldPlay = true;
         seek = (30+minutes)*60;
+      }else{
+        hoursToStart
       }
 
       var source = {
@@ -203,7 +212,8 @@ function enterCity(cityname){
       });
         player.play();
       }else{
-        $("#playerPlace").html(`<h4 class="text-white" dir='rtl'> هم اکنون برنامه ای آماده ی پخش نیست. </h4>`)
+
+        $("#playerPlace").html(`<h4 class="text-white" dir='rtl'>  هم اکنون برنامه ای آماده ی پخش نیست. برنامه بعدی ساعت  </h4>`)
       }
 
     })
