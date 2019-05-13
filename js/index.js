@@ -1,3 +1,13 @@
+radioprogram = {};
+fetch('./js/data.json')
+.then(function(response) {
+console.log(response);
+  return response.json();
+})
+.then(function(myJson) {
+  radioprogram = myJson;
+});
+
 function scheduleEvent(time, triggerThis) {
 
   // get hour and minute from hour:minute param received, ex.: '16:00'
@@ -106,7 +116,7 @@ function enterCity(cityname){
       };
       
       marker = new H.map.Marker(position);
-      console.log(obj);
+     // console.log(obj);
       map.addObject(marker);
       var lat1 = obj.Response.View[0].Result[0].Location.MapView.TopLeft.Latitude;
       var lng1 = obj.Response.View[0].Result[0].Location.MapView.TopLeft.Longitude;
@@ -115,7 +125,7 @@ function enterCity(cityname){
       var bbox = new H.geo.Rect(lat1,lng1,lat2,lng2);
       map.setViewBounds(bbox);
 
-      console.log("raw offset = "+rawOffset);
+      //console.log("raw offset = "+rawOffset);
 
       gmtOffset = rawOffset/3600;
 
@@ -149,7 +159,7 @@ function enterCity(cityname){
       maghribHour = parseInt(maghribTimeStr[0]);
       maghribMin = parseInt(maghribTimeStr[1]);
 
-      console.log(times);
+      //console.log(times);
 
       var nowDate = new Date(); 
       var now_utc =  Date.UTC(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate(),
@@ -166,40 +176,65 @@ function enterCity(cityname){
        diff = now_utc - maghrib_utc;
       var minutesToMaghrib = Math.floor((diff/1000)/60);
       var seek = 0;
-      console.log("minutes to fajr = "+ minutesToFajr);
-      console.log("minutes to maghrib = "+ minutesToMaghrib);
+      //console.log("minutes to fajr = "+ minutesToFajr);
+      //console.log("minutes to maghrib = "+ minutesToMaghrib);
 
       //nextEvent = "fajr" , "maghrib" , "none"
       var nextEvent="";
-      if(minutesToFajr< 0){
+      if(minutesToFajr< 30){
         nextEvent = "fajr";
       }else{
-        if(minutesToMaghrib<0){
+        if(minutesToMaghrib<30){
           nextEvent = "maghrib";
         }else{
           nextEvent = "none";
         }
       }
-      console.log(nextEvent);
+      //console.log(nextEvent);
       //var itsFajrTime = Math.abs(minutesToFajr)<Math.abs(minutesToMaghrib);
       //var itsMaghribTime = Math.abs(minutesToFajr)<Math.abs(minutesToMaghrib);
 
-      var fajrURL = "./Shajarian-Rabana.mp3";
-      var maghribURL = "./Shajarian-Rabana.mp3";
-      var mp3url="";
+      var today = new Date(Date.now());
+      var todayIndex =0;
+      var todayArray = today.toLocaleDateString().replace(/\u200E/g,"").split('/');
+      for(var i=0;i<radioprogram.sahar.length;i++){    
+        var dateArray = radioprogram.sahar[i].date.replace(/\u200E/g,"").split('/');
+        if(parseInt(todayArray[0]) === parseInt(dateArray[0]) && 
+        parseInt(todayArray[1]) === parseInt(dateArray[1]) &&
+         parseInt(todayArray[2]) === parseInt(dateArray[2])){
+          todayIndex = i;
+          break;
+        }
+      }
+      //console.log(todayIndex, " is today's index");
+
+      var fajrURL = radioprogram.sahar[todayIndex].url;
+      var maghribURL =  radioprogram.eftar[todayIndex].url;
+      
+      var mp3url= "";
       var minutes = 0;
 
       var messageString ="";
       var startTotalMinute = 0;
 
+      var programEarlyTime = 0;
+      var programDuration = 0;
       if(nextEvent === "fajr"){
+        var azantimeString = radioprogram.sahar[todayIndex].azanTime;
+        var durationStr =  radioprogram.sahar[todayIndex].duration;
+        programDuration = parseInt(durationStr.split(':')[0])*60 + parseInt(durationStr.split(':')[1]);
         mp3url = fajrURL;
         minutes = minutesToFajr;
-        startTotalMinute = fajrHour*60+fajrMin -30;
+        programEarlyTime = parseInt(azantimeString.split(':')[1]);
+        startTotalMinute = fajrHour*60+fajrMin -programEarlyTime;
       }else if(nextEvent === "maghrib"){
+        var azantimeString = radioprogram.eftar[todayIndex].azanTime;
+        var durationStr =  radioprogram.eftar[todayIndex].duration;
+        programDuration = parseInt(durationStr.split(':')[0])*60 + parseInt(durationStr.split(':')[1]);
         mp3url = maghribURL;
         minutes = minutesToMaghrib;
-        startTotalMinute = maghribHour*60+maghribMin -30;
+        programEarlyTime = parseInt(azantimeString.split(':')[1]);
+        startTotalMinute = maghribHour*60+maghribMin -programEarlyTime;
       }else if(nextEvent === "none"){
 
       }
@@ -209,7 +244,7 @@ function enterCity(cityname){
       
 
       if(nextEvent === "fajr"){
-        console.log("its fajr");
+        //console.log("its fajr");
         messageString = `<h5 class="text-white" dir='rtl'> هم اکنون برنامه ای آماده ی پخش نیست. برنامه بعدی ساعت
          ${startTimeString} پخش میشود. 
         </h5>`;
@@ -222,9 +257,9 @@ function enterCity(cityname){
         </h5>`;
       }
   
-      if(minutes>-30&&minutes<30){
+      if(minutes>-programEarlyTime && minutes <programDuration - programEarlyTime){
         shouldPlay = true;
-        seek = (30+minutes)*60;
+        seek = (programEarlyTime+minutes)*60;
       }else{
         shouldPlay = false;
       }
@@ -261,6 +296,12 @@ function enterCity(cityname){
     }
 
       if(shouldPlay){
+        if(nextEvent == "fajr"){
+          $("#messagePlace").html(`<h5> ${radioprogram.sahar[todayIndex].name} </h5>`);
+        }else if(nextEvent == "maghrib"){
+          $("#messagePlace").html(`<h5> ${radioprogram.eftar[todayIndex].name} </h5>`);
+        }
+
         $("#playerPlace").html (`<audio id="player" controls></audio>`);
         const player = new Plyr('#player',ctrl);
         player.source = source;
@@ -269,7 +310,7 @@ function enterCity(cityname){
       });
         player.play();
       }else{
-        $("#playerPlace").html(messageString);
+        $("#messagePlace").html(messageString);
         var startTimeString = startHour.toString().padStart(2, '0') + ':' +(startMinute+1).toString().padStart(2, '0');
         scheduleEvent(startTimeString,function(){location.reload(); });   
       }
@@ -310,11 +351,8 @@ $(document).ready(() => {
 
     $('.toast').toast('show');
 
-    console.log('Show');
-
     $('.toast').on('hidden.bs.toast', e => {
       $(e.currentTarget).remove();
-      console.log('Hide');
     });
 
     enterCity("Los Angeles");
