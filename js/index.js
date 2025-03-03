@@ -8,10 +8,10 @@ fetch("./js/data.json")
     radioprogram = myJson;
   });
 
-  function reloadPage(){
-    console.log("now reloading");
-    location.reload();
-  }
+function reloadPage(){
+  console.log("now reloading");
+  location.reload();
+}
 
 function scheduleEvent(time, triggerThis) {
   // get hour and minute from hour:minute param received, ex.: '16:00'
@@ -32,106 +32,296 @@ function scheduleEvent(time, triggerThis) {
   setTimeout(triggerThis, firstTriggerAfterMs);
 }
 
-// Instantiate a map and platform object:
-var platform = new H.service.Platform({
-  app_id: "S1l6Ytl6LQj6Jv2e85Jr",
-  app_code: "ZVDIaS77COAlZFXgKPtUHw",
-  useHTTPS: true
-});
-// Retrieve the target element for the map:
-var targetElement = document.getElementById("mapContainer");
+// Global variables 
+var map = null;
+var marker = null;
+var mapContainer = null;
+var searchResults = null;
+var searchResultsList = null;
+var searchInput = null;
+var searchButton = null;
+var mapEnabled = true;
 
-// Get default map types from the platform object:
-var defaultLayers = platform.createDefaultLayers();
-
-// Instantiate the map:
-var map = new H.Map(
-  document.getElementById("mapContainer"),
-  defaultLayers.normal.map,
-  {
-    zoom: 0,
-    center: { lat: 0, lng: 0 }
+// Initialize the map
+async function initMap() {
+  mapContainer = document.getElementById('mapContainer');
+  if (!mapContainer) {
+    console.error('Map container not found');
+    return;
   }
-);
 
-// Create the parameters for the geocoding request:
-var geocodingParams = {
-  searchText: "200 S Mathilda Ave, Sunnyvale, CA"
-};
+  try {
+    // Initialize Google Maps
+    map = new google.maps.Map(mapContainer, {
+      center: { lat: 34.0549076, lng: -118.242643 },
+      zoom: 10,
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: false
+    });
 
-// Define a callback function to process the geocoding response:
-var onResult = function(result) {
-  var locations = result.Response.View[0].Result,
-    position,
-    marker;
-  // Add a marker for each location found
-  for (i = 0; i < locations.length; i++) {
-    position = {
-      lat: locations[i].Location.DisplayPosition.Latitude,
-      lng: locations[i].Location.DisplayPosition.Longitude
+    // Create a marker using AdvancedMarkerElement if available
+    if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
+      marker = new google.maps.marker.AdvancedMarkerElement({
+        map: map,
+        position: map.getCenter()
+      });
+    } else {
+      marker = new google.maps.Marker({
+        map: map,
+        position: map.getCenter()
+      });
+    }
+  } catch (error) {
+    console.error('Error initializing map:', error);
+    if (mapContainer) {
+      mapContainer.innerHTML = '<div class="alert alert-danger">Failed to initialize map. Please try again later.</div>';
+    }
+  }
+}
+
+// Load Maps API
+function loadMapsApi() {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = `https://firebase-replacement.www-ehsan-com.workers.dev/?maps=true&origin=${encodeURIComponent(window.location.origin)}`;
+    script.async = true;
+    script.defer = true;
+    script.onerror = (error) => {
+      console.error('Error loading Maps API:', error);
+      if (mapContainer) {
+        mapContainer.innerHTML = '<div class="alert alert-danger">Failed to load map. Please try again later.</div>';
+      }
+      reject(error);
     };
+    script.onload = () => resolve();
+    document.head.appendChild(script);
+  });
+}
 
-    marker = new H.map.Marker(position);
-    //console.log(result);
-    map.addObject(marker);
+// Search for a location
+function searchLocation() {
+    var query = searchInput.value;
+    if (query.trim() === '') return;
 
-    map.setCenter(position);
-    map.setZoom(8);
+    searchResultsList.innerHTML = '<div class="loading">Searching...</div>';
+    searchResults.classList.add('active');
+
+    // Use the proxy for geocoding
+    fetch(`https://firebase-replacement.www-ehsan-com.workers.dev/?address=${encodeURIComponent(query)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data && data.geocode) {
+                displaySearchResults([data.geocode]);
+            } else {
+                searchResultsList.innerHTML = '<div class="error">No results found</div>';
+            }
+        })
+        .catch(error => {
+            searchResultsList.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+        });
+}
+
+// Display search results
+function displaySearchResults(results) {
+    searchResultsList.innerHTML = '';
+    
+    if (results.length === 0) {
+        searchResultsList.innerHTML = '<div class="no-results">No results found</div>';
+        return;
+    }
+
+    results.forEach(result => {
+        var item = document.createElement('div');
+        item.className = 'search-result-item';
+        
+        var title = document.createElement('div');
+        title.className = 'search-result-title';
+        title.textContent = result.formatted_address || 'Unknown location';
+        
+        item.appendChild(title);
+        
+        item.addEventListener('click', function() {
+            selectLocation(result);
+        });
+        
+        searchResultsList.appendChild(item);
+    });
+}
+
+// Select a location from search results
+function selectLocation(result) {
+    searchResults.classList.remove('active');
+    searchInput.value = result.formatted_address || '';
+    
+    if (mapEnabled && map) {
+        var location = result.geometry.location;
+        
+        // Center the map on the selected location
+        map.setCenter(location);
+        map.setZoom(14);
+        
+        // Remove existing marker if any
+        if (marker) {
+            marker.setMap(null);
+        }
+        
+        // Add a marker for the selected location
+        marker = new google.maps.Marker({
+            map: map,
+            position: location,
+            animation: google.maps.Animation.DROP
+        });
+    }
+}
+
+// Initialize when the page loads
+document.addEventListener('DOMContentLoaded', async function() {
+  // Get DOM elements
+  mapContainer = document.getElementById('mapContainer');
+  searchInput = document.getElementById('search-input');
+  searchButton = document.getElementById('search-button');
+  const cityInput = document.getElementById('city-input');
+
+  // Check if map should be disabled
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.has('nomap')) {
+    mapEnabled = false;
+    if (mapContainer) {
+      mapContainer.style.display = 'none';
+    }
   }
-};
+  
+  // Initialize the map if enabled
+  if (mapEnabled && mapContainer) {
+    try {
+      await loadMapsApi();
+      window.initMap = initMap;
+    } catch (error) {
+      console.error('Failed to load Maps API:', error);
+    }
+  }
+  
+  // Setup event listeners with null checks
+  if (searchButton) {
+    searchButton.addEventListener('click', searchLocation);
+  }
+  if (searchInput) {
+    searchInput.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') searchLocation();
+    });
+  }
 
-// Get an instance of the geocoding service:
-var geocoder = platform.getGeocodingService();
+  // Setup city input autocomplete with debouncing
+  if (cityInput) {
+    let debounceTimer;
+    
+    $(cityInput).on("input", function(e) {
+      const query = sanitizeInput(e.target.value);
+      
+      // Clear previous timer
+      clearTimeout(debounceTimer);
+      
+      // Don't make request for empty or very short queries
+      if (query.length < 2) {
+        $("#city-input").autocomplete("close");
+        return;
+      }
+      
+      // Set new timer
+      debounceTimer = setTimeout(() => {
+        const searchstr = `https://firebase-replacement.www-ehsan-com.workers.dev/?address=${encodeURIComponent(query)}&autocomplete=true`;
+        
+        fetch(searchstr)
+          .then(response => response.json())
+          .then(function(data) {
+            const suggestions = data.predictions?.map(prediction => ({
+              label: prediction.description,
+              value: prediction.description
+            })) || [];
+
+            $("#city-input").autocomplete({
+              minLength: 2,
+              source: suggestions,
+              select: function(e, ui) {
+                enterCity(ui.item.value);
+                return false;
+              }
+            }).autocomplete("instance")._renderItem = function(ul, item) {
+              return $("<li>")
+                .append(`<div>${item.label}</div>`)
+                .appendTo(ul);
+            };
+            
+            if (suggestions.length > 0) {
+              $("#city-input").autocomplete("search", query);
+            }
+          })
+          .catch(error => {
+            console.error('Error fetching suggestions:', error);
+          });
+      }, 300); // 300ms delay
+    });
+  }
+
+  // Show toast and initialize with Los Angeles
+  $(".toast").toast("show");
+  $(".toast").on("hidden.bs.toast", e => {
+    $(e.currentTarget).remove();
+  });
+
+  // Initial city
+  setTimeout(() => enterCity("Los Angeles"), 1000);
+});
 
 function enterCity(cityname) {
-  //make keyboard go away
-  var hideKeyboard = function() {
-    document.activeElement.blur();
-    $("#city-input").blur();
-  };
-
   if (cityname === "") {
-    cityname = $("#city-input").val();
-  } else {
+    cityname = document.getElementById("city-input")?.value || "";
   }
-  var geocodingParams = {
-    searchText: cityname
-  };
 
-  var searchstr = `https://geocoder.api.here.com/6.2/geocode.json?app_id=S1l6Ytl6LQj6Jv2e85Jr&app_code=ZVDIaS77COAlZFXgKPtUHw&searchtext=${cityname}&gen=9&locationattributes=tz`;
-  fetch(searchstr).then(function(data) {
-    data.json().then(function(obj) {
-      var rawOffset =
-        obj.Response.View[0].Result[0].Location.AdminInfo.TimeZone.rawOffset;
+  // Use the proxy to geocode the city name
+  var searchstr = `https://firebase-replacement.www-ehsan-com.workers.dev/?address=${encodeURIComponent(cityname)}`;
+  fetch(searchstr)
+    .then(response => response.json())
+    .then(function(obj) {
+      // Get raw offset from the timezone data
+      var rawOffset = obj.timezone?.rawOffset || 0;
+
+      // Get lat/lng from the geocode result
       var position = {
-        lat:
-          obj.Response.View[0].Result[0].Location.NavigationPosition[0]
-            .Latitude,
-        lng:
-          obj.Response.View[0].Result[0].Location.NavigationPosition[0]
-            .Longitude
+        lat: obj.geocode?.geometry?.location?.lat || 0,
+        lng: obj.geocode?.geometry?.location?.lng || 0
       };
 
-      marker = new H.map.Marker(position);
-      // console.log(obj);
-      map.addObject(marker);
-      var lat1 =
-        obj.Response.View[0].Result[0].Location.MapView.TopLeft.Latitude;
-      var lng1 =
-        obj.Response.View[0].Result[0].Location.MapView.TopLeft.Longitude;
-      var lat2 =
-        obj.Response.View[0].Result[0].Location.MapView.BottomRight.Latitude;
-      var lng2 =
-        obj.Response.View[0].Result[0].Location.MapView.BottomRight.Longitude;
-      var bbox = new H.geo.Rect(lat1, lng1, lat2, lng2);
-      map.setViewBounds(bbox);
+      // Update map marker
+      if (marker) {
+        marker.setMap(null);
+      }
+      
+      if (map) {
+        marker = new google.maps.Marker({
+          position: position,
+          map: map
+        });
 
-      //console.log("raw offset = "+rawOffset);
+        // If bounds exist, fit map to them
+        if (obj.geocode?.geometry?.bounds) {
+          var ne = obj.geocode.geometry.bounds.northeast;
+          var sw = obj.geocode.geometry.bounds.southwest;
+          var bounds = new google.maps.LatLngBounds(
+            new google.maps.LatLng(sw.lat, sw.lng),
+            new google.maps.LatLng(ne.lat, ne.lng)
+          );
+          map.fitBounds(bounds);
+        } else {
+          map.setCenter(position);
+          map.setZoom(8);
+        }
+      }
 
       gmtOffset = rawOffset / 3600;
 
       var date = new Date(); // today
-      //var times = prayTimes.getTimes(date, [lat, lng], timeoffset);
       prayTimes.setMethod("Tehran");
       var times = prayTimes.getTimes(
         date,
@@ -161,7 +351,7 @@ function enterCity(cityname) {
       html += "</tbody></table>";
       document.getElementById("table").innerHTML = html;
 
-      // check if anything can be played
+      // Check if anything can be played
       shouldPlay = false;
 
       fajrTimeStr = times["fajr"].split(":");
@@ -171,8 +361,6 @@ function enterCity(cityname) {
       maghribTimeStr = times["maghrib"].split(":");
       maghribHour = parseInt(maghribTimeStr[0]);
       maghribMin = parseInt(maghribTimeStr[1]);
-
-      //console.log(times);
 
       var nowDate = new Date();
       var now_utc = Date.UTC(
@@ -220,7 +408,6 @@ function enterCity(cityname) {
           nextEvent = "none";
         }
       }
-      
 
       var today = new Date(Date.now());
       var todayIndex = 0;
@@ -241,7 +428,6 @@ function enterCity(cityname) {
           break;
         }
       }
-      //console.log(todayIndex, " is today's index");
 
       var fajrURL = radioprogram.sahar[todayIndex].url;
       var maghribURL = radioprogram.eftar[todayIndex].url;
@@ -274,9 +460,8 @@ function enterCity(cityname) {
         minutes = minutesToMaghrib;
         programEarlyTime = parseInt(azantimeString.split(":")[1]);
         startTotalMinute = maghribHour * 60 + maghribMin - programEarlyTime;
-      } else if (nextEvent === "none") {
       }
-      console.log(nextEvent);
+
       var startMinute = startTotalMinute % 60;
       var startHour = Math.floor(startTotalMinute / 60);
       var startTimeString =
@@ -285,7 +470,6 @@ function enterCity(cityname) {
         startMinute.toString().padStart(2, "0");
 
       if (nextEvent === "fajr") {
-        //console.log("its fajr");
         messageString = `<h5 class="text-white" dir='rtl'> هم اکنون برنامه ای آماده ی پخش نیست. برنامه بعدی ساعت
          ${startTimeString} پخش میشود. 
         </h5>`;
@@ -298,17 +482,12 @@ function enterCity(cityname) {
         </h5>`;
       }
 
-
-
       if (
         minutes >= -programEarlyTime &&
         minutes < programDuration - programEarlyTime
-    
       ) {
         shouldPlay = true;
         seek = (programEarlyTime + minutes) * 60;
-      } else {
-        shouldPlay = false;
       }
 
       var source = {
@@ -321,24 +500,14 @@ function enterCity(cityname) {
           }
         ]
       };
+
       var ctrl = {
         controls: [
-          "play-large", // The large play button in the center
-          //'restart', // Restart playback
-          //'rewind', // Rewind by the seek time (default 10 seconds)
-          "play", // Play/pause playback
-          //'fast-forward', // Fast forward by the seek time (default 10 seconds)
-          //'progress', // The progress bar and scrubber for playback and buffering
-          //'current-time', // The current time of playback
-          //'duration', // The full duration of the media
-          "mute", // Toggle mute
-          "volume", // Volume control
-          //'captions', // Toggle captions
-          //'settings', // Settings menu
-          //'pip', // Picture-in-picture (currently Safari only)
-          "airplay" // Airplay (currently Safari only)
-          //'download', // Show a download button with a link to either the current source or a custom URL you specify in your options
-          //'fullscreen', // Toggle fullscreen
+          "play-large",
+          "play",
+          "mute",
+          "volume",
+          "airplay"
         ]
       };
 
@@ -367,49 +536,22 @@ function enterCity(cityname) {
           ":" +
           (startMinute + 1).toString().padStart(2, "0");
 
-        scheduleEvent(startTimeString,reloadPage);
+        scheduleEvent(startTimeString, reloadPage);
       }
     });
-  });
 }
 
+// Add error handling for API quota exceeded
+function handleApiError(error) {
+  if (error.status === 429) {
+    console.error('API quota exceeded');
+    // Show user-friendly message
+    return;
+  }
+  // Handle other errors
+}
 
-
-$("#city-input").on("input", function(e) {
-  var searchstr = `https://geocoder.api.here.com/6.2/geocode.json?app_id=S1l6Ytl6LQj6Jv2e85Jr&app_code=ZVDIaS77COAlZFXgKPtUHw&searchtext=${
-    e.target.value
-  }&gen=9&locationattributes=tz`;
-  fetch(searchstr).then(function(data) {
-    data.json().then(function(obj) {
-      availableTags = [];
-      for (var i = 0; i < obj.Response.View[0].Result.length; i++) {
-        var adr = obj.Response.View[0].Result[i].Location.Address;
-
-        availableTags.push(adr.Label);
-      }
-
-      $("#city-input").autocomplete({
-        minLength: 1,
-        source: availableTags,
-        focus: function() {
-          return false;
-        },
-        //select
-        select: function(e, ui) {
-          enterCity(ui.item.value);
-        }
-      });
-      $("#city-input").autocomplete("search");
-    });
-  });
-});
-
-$(document).ready(() => {
-  $(".toast").toast("show");
-
-  $(".toast").on("hidden.bs.toast", e => {
-    $(e.currentTarget).remove();
-  });
-
-  enterCity("Los Angeles");
-});
+// Add input sanitization
+function sanitizeInput(input) {
+  return input.replace(/[<>]/g, '').trim().substring(0, 100);
+}
